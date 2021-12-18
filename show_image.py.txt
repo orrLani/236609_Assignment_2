@@ -1,0 +1,109 @@
+#!/usr/bin/env python
+# Import ROS libraries and messages
+import rospy
+from sensor_msgs.msg import Image
+
+# Import OpenCV libraries and tools
+import cv2
+from cv_bridge import CvBridge, CvBridgeError
+from collections import deque
+import numpy as np
+import argparse
+import cv2
+import imutils
+import time
+import pandas as pd
+import time
+
+# define the lower and upper boundaries of the "blue"
+BlueLower = (100, 150, 0)
+BlueUpper = (140,255,255)
+RAD_MAX = 350
+RAD_MIN = 330
+
+class Ball_Identification:
+
+    def __init__(self):
+        # Initialize the ROS Node named 'opencv_example', allow multiple nodes to be run with this name
+        rospy.init_node('opencv_example', anonymous=True)
+
+        # Print "Hello ROS!" to the Terminal and to a ROS Log file located in ~/.ros/log/loghash/*.log
+        rospy.loginfo("Hello ROS!")
+
+        sub_image = rospy.Subscriber("/camera/rgb/image_raw", Image, self.image_callback)
+
+        cv2.namedWindow("Image Window", 1)
+
+    def show_image(self,img):
+        cv2.imshow("Image Window", img)
+        cv2.waitKey(3)
+
+    def image_callback(self,img_msg):
+        # log some info about the image topic
+        rospy.loginfo(img_msg.header)
+
+
+        image = bridge.imgmsg_to_cv2(img_msg, "passthrough")
+        # resize the image
+        image = imutils.resize(image, width=1800)
+        # Converts an image from one color space to another
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        # add gaussian blur
+        blurred = cv2.GaussianBlur(image, (11, 11), 0)
+
+        # image = cv2.cvtColor( image, cv2.COLOR_BGR2RGB)
+
+        hsv = cv2.cvtColor(blurred, cv2.COLOR_BGR2HSV)
+
+        # find the blue image
+
+        msk_blue = cv2.inRange(hsv, BlueLower, BlueUpper)
+        msk_blue = cv2.erode(msk_blue, None, iterations=2)
+        msk_blue = cv2.dilate(msk_blue, None, iterations=2)
+        # find the blue image
+
+        # find contours in the mask and initialize the current
+        # (x, y) center of the ball
+        cnts = cv2.findContours(msk_blue.copy(), cv2.RETR_EXTERNAL,
+                                cv2.CHAIN_APPROX_SIMPLE)
+
+        cnts = imutils.grab_contours(cnts)
+        # print(cnts)
+
+        if len(cnts) > 0:
+            # find the largest contour in the mask, then use
+            # it to compute the minimum enclosing circle and
+            # centroid
+            c = max(cnts, key=cv2.contourArea)
+            ((x, y), radius) = cv2.minEnclosingCircle(c)
+            M = cv2.moments(c)
+            center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
+            # only proceed if the radius meets a minimum size
+            print(radius)
+            if radius > RAD_MIN and radius < RAD_MAX:
+
+                # draw the circle and centroid on the frame,
+                # then update the list of tracked points
+                cv2.circle(image, (int(x), int(y)), int(radius),
+                           (0, 255, 255), 2)
+                cv2.circle(image, center, 5, (0, 0, 255), -1)
+
+        self.show_image(image)
+
+if __name__ == '__main__':
+
+
+    # Initialize the CvBridge class
+    bridge = CvBridge()
+
+    start = time.time()
+
+    bi = Ball_Identification()
+
+    # Loop to keep the program from shutting down unless ROS is shut down, or CTRL+C is pressed
+    while not rospy.is_shutdown():
+        rospy.spin()
+
+    # Define a function to show the image in an OpenCV Window
+
+
